@@ -1,6 +1,10 @@
 module Lib
-    ( someFunc
+    ( Info(..)
     ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+data Info = Info
+  { name :: (String, String)
+  , errF :: String
+  , tokenType :: String
+  , tokens :: [(String, String)]
+  } deriving Show
