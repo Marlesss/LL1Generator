@@ -16,6 +16,7 @@ import Lexer
   nonTerm  { GTNonTerm $$ }
   term     { GTTerm $$ }
   block    { GTBlock $$ }
+  regex    { GTRegex $$ }
 
 %%
 
@@ -25,7 +26,13 @@ Header : block { $1 }
 
 Directives : list(snd('%', Directive)) { $1 }
 
-Directive : term list(or(term, or(nonTerm, block))) { Directive $1 $2 }
+Directive : term list(DirectiveArg) { Directive $1 $2 }
+
+DirectiveArg
+  : term    { Term $1 }
+  | nonTerm { NonTerm $1 }
+  | block   { Block $1 }
+  | regex   { Regex $1 }
 
 Productions : list(Production) { $1 }
 
@@ -61,7 +68,12 @@ sep1(p,q) : p list(snd(q,p)) { $1 : $2 }
 
 {
 data Grammar = Grammar Block [Directive] [Production] Block deriving Show
-data Directive = Directive TermName [Either TermName (Either NonTermName Block)] deriving Show
+data Directive = Directive TermName [DirectiveArg] deriving Show
+data DirectiveArg
+  = Term TermName
+  | NonTerm NonTermName
+  | Block Block
+  | Regex String
 data Production = Prod NonTermName [Rule] deriving Show
 data Rule = Rule [Either TermName NonTermName] Block deriving Show
 

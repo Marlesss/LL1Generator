@@ -64,14 +64,15 @@ getFollow info fstMap prods = whileChanges updFollow (addEOI empty (snd (name in
 
 
 mkParsers :: Info -> [Production] -> Q [Dec]
-mkParsers info@(Info (parFunS, parTyS) errFunS tokTyS toks) prods
+mkParsers info@(Info (parFunS, parTyS) errFunS tokTyS toks skip) prods
   = do let prodMap = DM.fromList (map (\(Prod n rules) -> (n, rules)) prods)
            fstMap  = getFirst prodMap
            flwMap  = getFollow info fstMap prodMap
            tokName = mkName tokTyS
-       (parseTyN, decs1) <- mkClassParse tokName
-       decs2 <- sequence (map (mkParse parseTyN fstMap flwMap) prods)
-       pure $ decs1 ++ (concat decs2)
+       decs1 <- mkLexer info
+       (parseTyN, decs2) <- mkClassParse tokName
+       decs3 <- sequence (map (mkParse parseTyN fstMap flwMap) prods)
+       pure $ decs1 ++ decs2 ++ (concat decs3)
 
 mkClassParse :: Name -> Q (Name, [Dec])
 mkClassParse tokName
@@ -128,11 +129,11 @@ mkParse parseTyN fstMap flwMap (Prod nTStr rules)
                            fstChck = AppE (AppE (VarE inFirst) (VarE tkns)) (ListE (map (LitE . StringL) (catMaybes fstList)))
                            flwChck = AppE (AppE (VarE inFollow) (VarE tkns)) (ListE (map maybeToExp flwList))
                        in if elem Nothing fstList
-                            then InfixE (Just fstChck) (VarE '(||)) (Just flwChck)
+                            then InfixE (Just fstChck) (VarE (mkName "||")) (Just flwChck)
                             else fstChck
               where
-                maybeToExp (Just a) = AppE (ConE 'Just) (LitE (StringL a))
-                maybeToExp Nothing = ConE 'Nothing
+                maybeToExp (Just a) = AppE (ConE (mkName "Just")) (LitE (StringL a))
+                maybeToExp Nothing = ConE (mkName "Nothing")
             expr = do (kidsNames, tknsRest, decs) <- genDecs
                       let action = getExp block (length sent)
                       let applied = foldr (\kid a -> AppE a (VarE kid)) action kidsNames
@@ -150,3 +151,47 @@ mkParse parseTyN fstMap flwMap (Prod nTStr rules)
                                           (Right nTerm) -> AppE (VarE (mkName "_parse")) (VarE tkns)
                                           (Left term) -> AppE (AppE (VarE (mkName "consume")) (VarE tkns)) (LitE (StringL term))
                                pure $ (kid, tknsNew, dec expr)
+
+mkLexer :: Info -> Q [Dec]
+mkLexer info
+  = concat <$> sequence [ mkTokenData info, mkNameFunc info, mkLexerConstants info]
+
+mkLexerConstants :: Info -> Q [Dec]
+mkLexerConstants info = concat <$> sequence [ mkRegexs, mkSkip ]
+  where
+    mkRegexs
+      = do let regexsN = mkName "regexs"
+           pure $ [ValD (VarP regexsN) (NormalB (ListE getRegexs)) []]
+      where
+        getRegexs = map getRegex (tokens info)
+        getRegex (_, r, b) = TupE [ Just (LitE (StringL ('^':r)))
+                                  , Just (getFunc (parseExp b)) ]
+        getFunc (AppE c@(ConE _) (ConE _)) = InfixE (Just c) (VarE (mkName ".")) (Just $ VarE (mkName "read"))
+        getFunc c@(ConE _) = AppE (VarE (mkName "const")) c
+    mkSkip = let skipN = mkName "skip" in pure $ [ValD (VarP skipN) (NormalB (LitE (StringL $ '^':(skip info)))) []]
+
+mkTokenData :: Info -> Q [Dec]
+mkTokenData info
+  = do let tokTyN = mkName (tokenType info)
+           deriv  = [DerivClause Nothing [ConT (mkName "Show")]]
+       pure $ [DataD [] tokTyN [] Nothing cons deriv]
+  where
+    cons = map (\(_, _, x) -> mkCon x) (tokens info)
+    mkCon str = let (tokCN, args) = parseConD in
+      NormalC tokCN (map (\argTN -> (Bang NoSourceUnpackedness NoSourceStrictness, ConT argTN)) args)
+      where
+        parseConD = case parseExp str of
+          (AppE (ConE tokCN) (ConE argTN)) -> (tokCN, [argTN])
+          (ConE tokCN)                     -> (tokCN, [])
+          _                                -> error $ "unknown token signature: " ++ str
+
+mkNameFunc :: Info -> Q [Dec]
+mkNameFunc info = let tN = mkName "t"
+  in pure $ [FunD (mkName "name") [Clause [VarP tN] (NormalB (CaseE (VarE tN) matches)) []]]
+  where
+    matches = map getMatch (tokens info)
+    getMatch (tS, _, tBlock) = Match conPat (NormalB (LitE (StringL tS))) []
+      where
+        conPat = case parseExp tBlock of
+          (AppE (ConE tokCN) (ConE argTN)) -> ConP tokCN [] [WildP]
+          (ConE tokCN) -> ConP tokCN [] []

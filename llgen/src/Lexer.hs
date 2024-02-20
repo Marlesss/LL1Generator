@@ -16,6 +16,7 @@ data GrammarToken
   | GTNonTerm String
   | GTTerm String
   | GTBlock String
+  | GTRegex String
   deriving Show
 
 type Block = String
@@ -28,6 +29,7 @@ lexer ('%':'%':cs) = GTDelim   : lexer cs
 lexer ('%':cs)     = GTPercent : lexer cs
 lexer (':':cs)     = GTColon   : lexer cs
 lexer ('|':cs)     = GTPipe    : lexer cs
+lexer ('/':cs)     = lexDelim '/' GTRegex cs
 lexer ('{':cs)     = lexDelim '}' GTBlock cs
 lexer ('\'':cs)    = lexDelim '\'' (\x -> GTTerm $ "'" ++ x ++ "'") cs
 lexer ('\"':cs)    = lexDelim '\'' (\x -> GTTerm $ "\"" ++ x ++ "\"") cs

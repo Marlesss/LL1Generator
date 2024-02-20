@@ -1,6 +1,7 @@
 {
 module SimpleHaskell
-  ( getExp
+  ( parseExp
+  , getExp
   , argName ) where
 
 import Language.Haskell.TH
@@ -9,7 +10,7 @@ import Data.List
 import Data.Maybe
 }
 
-%name parseExp Infix
+%name tokensParseExp Infix
 
 %tokentype { Token }
 %error { parseError }
@@ -85,8 +86,10 @@ argName x = mkName $ "arg_" ++ show x
 
 parseError tkns = error $ "Error during parsing haskell code: " ++ show tkns
 
-getExp inp n = LamE pat $ (parseExp . lexer) inp
+getExp inp n = LamE pat $ parseExp inp
   where
     pat = map (\i -> VarP (argName i)) [1..n]
+
+parseExp = tokensParseExp . lexer
 }
 

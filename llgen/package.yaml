@@ -39,6 +39,7 @@ library:
     - text
     - containers
     - template-haskell
+    - regex-tdfa
   build-tools:
     - happy
 
