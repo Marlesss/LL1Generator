@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Language.Haskell.TH.ParseGen where
+module Language.Haskell.TH.ParseGen(mkParsers) where
 
 import Grammar(Production(..), Rule(..))
 import Lexer(NonTermName, TermName)
@@ -9,7 +9,6 @@ import Lib
 import Language.Haskell.TH.Syntax hiding (Info)
 import Language.Haskell.TH.Lib
 import Data.Maybe
-import Unsafe.Coerce
 import qualified Data.Map as DM
 import qualified Data.Set as DS
 
@@ -42,11 +41,11 @@ getFirst prods = whileChanges updFirst empty where
   empty = DM.map (const DS.empty) prods
 
   updFirst fstMap = DM.mapWithKey addInner fstMap where
-    addInner name vals = let rules = defLookup prods name [] in
+    addInner key vals = let rules = defLookup prods key [] in
       foldr (\(Rule sent _) v -> DS.union v (firstSent fstMap sent)) vals rules
 
 getFollow :: Info -> FFMap -> ProdMap -> FFMap
-getFollow info fstMap prods = whileChanges updFollow (addEOI empty (snd (name info))) where
+getFollow info fstMap prods = whileChanges updFollow (addEOI empty (name info)) where
     addEOI m start = DM.insert start (DS.singleton EOI) m
     empty = DM.map (const DS.empty) prods
 
@@ -64,7 +63,7 @@ getFollow info fstMap prods = whileChanges updFollow (addEOI empty (snd (name in
 
 
 mkParsers :: Info -> [Production] -> Q [Dec]
-mkParsers info@(Info (parFunS, parTyS) errFunS tokTyS toks skip) prods
+mkParsers info@(Info _ _ tokTyS _ _) prods
   = do let prodMap = DM.fromList (map (\(Prod n rules) -> (n, rules)) prods)
            fstMap  = getFirst prodMap
            flwMap  = getFollow info fstMap prodMap
@@ -83,10 +82,11 @@ mkClassParse tokName
        pure $ (parseTyN, decs)
   where
     parseFunDec argTN
-      = do let name = mkName "_parse"
-           sigD name (appT (appT arrowT (appT listT (conT tokName)))
-                           (appT (appT (tupleT 2) (varT argTN)) (appT listT (conT tokName))))
+      = do let parseFuncName = mkName "_parse"
+           sigD parseFuncName (appT (appT arrowT (appT listT (conT tokName)))
+                              (appT (appT (tupleT 2) (varT argTN)) (appT listT (conT tokName))))
 
+getFirstSent :: FFMap -> Sentence -> [Maybe String]
 getFirstSent ffmap sent = convert (DS.toList (firstSent ffmap sent))
   where
     convert [] = []
@@ -94,6 +94,7 @@ getFirstSent ffmap sent = convert (DS.toList (firstSent ffmap sent))
     convert (Eps:rest) = Nothing:convert rest
     convert (EOI:rest) = convert rest
 
+getFollowNT :: Ord k => DM.Map k (DS.Set WrapTerm) -> k -> [Maybe String]
 getFollowNT flwMap nTName = convert $ DS.toList (defLookup flwMap nTName DS.empty)
   where
     convert [] = []
@@ -107,10 +108,10 @@ mkParse parseTyN fstMap flwMap (Prod nTStr rules)
            instanceType = conT parseTyN `appT` conT tyName
        sequence [instanceD (pure []) instanceType [genParse]]
   where
-    genParse = funD (mkName "_parse") [genParseClause rules]
+    genParse = funD (mkName "_parse") [genParseClause]
 
-    genParseClause :: [Rule] -> Q Clause
-    genParseClause rules
+    genParseClause :: Q Clause
+    genParseClause
       = do tknsName <- newName "tkns"
            guards <- genGuards tknsName
            pure $ Clause [VarP tknsName] (GuardedB guards) []
@@ -144,13 +145,16 @@ mkParse parseTyN fstMap flwMap (Prod nTStr rules)
                                         pure (k:ks, tn, d:ds))
                             (pure ([], tkns, [])) (reverse sent)
             genDec :: Either String String -> Name -> Q (Name, Name, Dec)
-            genDec e tkns = do kid <- newName "kid"
-                               tknsNew <- newName "tkns"
-                               let dec expr = ValD (TupP [VarP kid, VarP tknsNew]) (NormalB expr) []
-                               let expr = case e of
-                                          (Right nTerm) -> AppE (VarE (mkName "_parse")) (VarE tkns)
-                                          (Left term) -> AppE (AppE (VarE (mkName "consume")) (VarE tkns)) (LitE (StringL term))
-                               pure $ (kid, tknsNew, dec expr)
+            genDec e tknsOld = do kid <- newName "kid"
+                                  tknsNew <- newName "tkns"
+                                  let dec e1 = ValD (TupP [VarP kid, VarP tknsNew]) (NormalB e1) []
+                                  let e2 = case e of
+                                             (Right nTerm) -> let typedParse = AppTypeE (VarE (mkName "_parse"))
+                                                                                        (ConT (mkName nTerm))
+                                                              in AppE typedParse (VarE tknsOld)
+                                             (Left term) -> AppE (AppE (VarE (mkName "consume")) (VarE tknsOld))
+                                                                 (LitE (StringL term))
+                                  pure $ (kid, tknsNew, dec e2)
 
 mkLexer :: Info -> Q [Dec]
 mkLexer info
@@ -168,6 +172,7 @@ mkLexerConstants info = concat <$> sequence [ mkRegexs, mkSkip ]
                                   , Just (getFunc (parseExp b)) ]
         getFunc (AppE c@(ConE _) (ConE _)) = InfixE (Just c) (VarE (mkName ".")) (Just $ VarE (mkName "read"))
         getFunc c@(ConE _) = AppE (VarE (mkName "const")) c
+        getFunc e = error $ "unknown token signature: " ++ show e
     mkSkip = let skipN = mkName "skip" in pure $ [ValD (VarP skipN) (NormalB (LitE (StringL $ '^':(skip info)))) []]
 
 mkTokenData :: Info -> Q [Dec]
@@ -193,5 +198,6 @@ mkNameFunc info = let tN = mkName "t"
     getMatch (tS, _, tBlock) = Match conPat (NormalB (LitE (StringL tS))) []
       where
         conPat = case parseExp tBlock of
-          (AppE (ConE tokCN) (ConE argTN)) -> ConP tokCN [] [WildP]
+          (AppE (ConE tokCN) (ConE _)) -> ConP tokCN [] [WildP]
           (ConE tokCN) -> ConP tokCN [] []
+          e -> error $ "unknown token signature: " ++ show e

@@ -3,7 +3,7 @@ module Lib
     ) where
 
 data Info = Info
-  { name :: (String, String)
+  { name :: String
   , errF :: String
   , tokenType :: String
   , tokens :: [(String, String, String)]

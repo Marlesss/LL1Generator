@@ -74,6 +74,7 @@ data DirectiveArg
   | NonTerm NonTermName
   | Block Block
   | Regex String
+  deriving Show
 data Production = Prod NonTermName [Rule] deriving Show
 data Rule = Rule [Either TermName NonTermName] Block deriving Show
 

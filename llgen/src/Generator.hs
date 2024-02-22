@@ -1,15 +1,10 @@
-module Generator where
+module Generator(generate) where
 
 import Grammar
-import Lexer
-import Data.Maybe
-import Data.List
 import Lib
 import qualified Language.Haskell.TH as TH
-import qualified Language.Haskell.TH.ParseGen as PG
+import Language.Haskell.TH.ParseGen
 import qualified Data.Text as T
-import qualified Data.Map as DM
-import qualified Data.Set as DS
 
 lineSep :: [String] -> T.Text
 lineSep names = T.unlines (map T.pack names)
@@ -36,7 +31,7 @@ generate (Grammar h dirs prods t)
 genBody :: [Directive] -> [Production] -> IO T.Text
 genBody dirs prods
   = do let info = (getInfo dirs)
-       decs <- TH.runQ $ PG.mkParsers info prods
+       decs <- TH.runQ $ mkParsers info prods
        let doc = TH.ppr_list decs
        pure $ T.pack $ show doc
 
@@ -49,8 +44,8 @@ getInfo dirs = let dirsMap = map (\(Directive n args) -> (n, args)) dirs in
     (getToks $ lookup "token" dirsMap)
     (getSkip $ lookup "skip" dirsMap)
 
-getName :: Maybe [DirectiveArg] -> (String, String)
-getName (Just [Term fName, NonTerm stName]) = (fName, stName)
+getName :: Maybe [DirectiveArg] -> String
+getName (Just [NonTerm stName]) = stName
 getName args = error $ "name undefined" ++ show args
 
 getErrF :: Maybe [DirectiveArg] -> String
@@ -70,6 +65,7 @@ getSkip :: Maybe [DirectiveArg] -> String
 getSkip (Just [Regex r]) = r
 getSkip args = error $ "skip undefined: " ++ show args
 
+constBody :: T.Text
 constBody = T.pack $ "\n\
 \lexer :: String -> [Token]\n\
 \lexer [] = []\n\
@@ -81,7 +77,7 @@ constBody = T.pack $ "\n\
 \                             in lexer rest\n\
 \                        else error $ \"unexpected input: \" ++ str\n\
 \\n\
-\consume [] _ = parseError []\n\
+\consume a@[] _ = parseError a\n\
 \consume (t:rest) s\n\
 \  | name t == s = (getVal t, rest)\n\
 \  | otherwise = parseError (t:rest)\n\
