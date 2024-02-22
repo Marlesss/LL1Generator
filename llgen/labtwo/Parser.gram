@@ -1,0 +1,54 @@
+{=
+module Parser where
+=}
+
+%name S
+%tokentype {= Token =}
+%error {= parseError =}
+
+%token
+  void /void/                             {= TokenVoid =}
+  type /\b(int|float|char|double|long)\b/ {= TokenType String =}
+  word /[[:alpha:]][[:alnum:]]*/          {= TokenWord String =}
+  '('  /\(/                               {= TokenLBr =}
+  ')'  /\)/                               {= TokenRBr =}
+  ';'  /;/                                {= TokenSemiC =}
+  ','  /,/                                {= TokenComma =}
+  '*'  /\*/                               {= TokenAster =}
+
+%skip /[[:space:]]+/
+
+%%
+
+S : R word '(' L ')' ';' {= S $1 $2 $4 =}
+
+R : T    {= RT $1 =}
+  | void {= RVoid =}
+
+L : A Lf {= L $1 $2 =}
+  |      {= LEmpty =}
+
+Lf : ',' A Lf {= Lf $2 $3 =}
+   |          {= LfEmpty =}
+
+A : T word {= A $1 $2 =}
+
+T : type Tf {= T $1 $2 =}
+
+Tf : '*' Tf {= TfPoint $2 =}
+   |        {= TfEmpty =}
+{=
+
+type TWord = String
+type TType = String
+
+data S = S R TWord L deriving Show
+data R = RT T | RVoid deriving Show
+data L = L A Lf | LEmpty deriving Show
+data Lf = Lf A Lf | LfEmpty deriving Show
+data A = A T TWord deriving Show
+data T = T TType Tf deriving Show
+data Tf = TfPoint Tf | TfEmpty deriving Show
+
+parseError tkns = error $ "Parse Error!!!: " ++ show tkns
+=}

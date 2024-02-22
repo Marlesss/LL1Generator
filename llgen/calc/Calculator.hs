@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -w #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Calculator where
 import Language.Haskell.TH.ParseGen
@@ -74,26 +75,33 @@ regexs = [("^[[:digit:]]+", TokenN . read),
           ("^\\*", const TokenMult),
           ("^/", const TokenDiv)]
 skip = "^[[:space:]]+"
+getVal (TokenN x) = unsafeCoerce x
+getVal (t@(TokenLBr)) = unsafeCoerce t
+getVal (t@(TokenRBr)) = unsafeCoerce t
+getVal (t@(TokenPlus)) = unsafeCoerce t
+getVal (t@(TokenMinus)) = unsafeCoerce t
+getVal (t@(TokenMult)) = unsafeCoerce t
+getVal (t@(TokenDiv)) = unsafeCoerce t
 class Parse_0 a_1
     where {_parse :: [( Token )] -> (a_1, [( Token )])}
 instance Parse_0 E
     where {_parse tkns_2 | inFirst tkns_2 ["'('", "n"] = let {(kid_3,
-                                                               tkns_4) = _parse tkns_2;
-                                                              (kid_5, tkns_6) = _parse tkns_4}
+                                                               tkns_4) = _parse @T tkns_2;
+                                                              (kid_5, tkns_6) = _parse @Ef tkns_4}
                                                           in ((\arg_1 arg_2 -> E arg_1 arg_2) kid_3 kid_5,
                                                               tkns_6)
                          | otherwise = parseError tkns_2}
 instance Parse_0 Ef
     where {_parse tkns_7 | inFirst tkns_7 ["'+'"] = let {(kid_8,
                                                           tkns_9) = consume tkns_7 "'+'";
-                                                         (kid_10, tkns_11) = _parse tkns_9;
-                                                         (kid_12, tkns_13) = _parse tkns_11}
+                                                         (kid_10, tkns_11) = _parse @T tkns_9;
+                                                         (kid_12, tkns_13) = _parse @Ef tkns_11}
                                                      in ((\arg_1 arg_2 arg_3 -> Plus arg_2 arg_3) kid_8 kid_10 kid_12,
                                                          tkns_13)
                          | inFirst tkns_7 ["'-'"] = let {(kid_14,
                                                           tkns_15) = consume tkns_7 "'-'";
-                                                         (kid_16, tkns_17) = _parse tkns_15;
-                                                         (kid_18, tkns_19) = _parse tkns_17}
+                                                         (kid_16, tkns_17) = _parse @T tkns_15;
+                                                         (kid_18, tkns_19) = _parse @Ef tkns_17}
                                                      in ((\arg_1 arg_2 arg_3 -> Minus arg_2 arg_3) kid_14 kid_16 kid_18,
                                                          tkns_19)
                          | inFirst tkns_7 [] || inFollow tkns_7 [Just "')'", Nothing] = let
@@ -102,22 +110,22 @@ instance Parse_0 Ef
                          | otherwise = parseError tkns_7}
 instance Parse_0 T
     where {_parse tkns_20 | inFirst tkns_20 ["'('",
-                                             "n"] = let {(kid_21, tkns_22) = _parse tkns_20;
-                                                         (kid_23, tkns_24) = _parse tkns_22}
+                                             "n"] = let {(kid_21, tkns_22) = _parse @F tkns_20;
+                                                         (kid_23, tkns_24) = _parse @Tf tkns_22}
                                                      in ((\arg_1 arg_2 -> T arg_1 arg_2) kid_21 kid_23,
                                                          tkns_24)
                           | otherwise = parseError tkns_20}
 instance Parse_0 Tf
     where {_parse tkns_25 | inFirst tkns_25 ["'*'"] = let {(kid_26,
                                                             tkns_27) = consume tkns_25 "'*'";
-                                                           (kid_28, tkns_29) = _parse tkns_27;
-                                                           (kid_30, tkns_31) = _parse tkns_29}
+                                                           (kid_28, tkns_29) = _parse @F tkns_27;
+                                                           (kid_30, tkns_31) = _parse @Tf tkns_29}
                                                        in ((\arg_1 arg_2 arg_3 -> Mult arg_2 arg_3) kid_26 kid_28 kid_30,
                                                            tkns_31)
                           | inFirst tkns_25 ["'/'"] = let {(kid_32,
                                                             tkns_33) = consume tkns_25 "'/'";
-                                                           (kid_34, tkns_35) = _parse tkns_33;
-                                                           (kid_36, tkns_37) = _parse tkns_35}
+                                                           (kid_34, tkns_35) = _parse @F tkns_33;
+                                                           (kid_36, tkns_37) = _parse @Tf tkns_35}
                                                        in ((\arg_1 arg_2 arg_3 -> Div arg_2 arg_3) kid_32 kid_34 kid_36,
                                                            tkns_37)
                           | inFirst tkns_25 [] || inFollow tkns_25 [Just "')'",
@@ -129,7 +137,7 @@ instance Parse_0 Tf
 instance Parse_0 F
     where {_parse tkns_38 | inFirst tkns_38 ["'('"] = let {(kid_39,
                                                             tkns_40) = consume tkns_38 "'('";
-                                                           (kid_41, tkns_42) = _parse tkns_40;
+                                                           (kid_41, tkns_42) = _parse @E tkns_40;
                                                            (kid_43,
                                                             tkns_44) = consume tkns_42 "')'"}
                                                        in ((\arg_1 arg_2 arg_3 -> Brace arg_2) kid_39 kid_41 kid_43,
@@ -161,6 +169,3 @@ inFollow :: [Token] -> [Maybe String] -> Bool
 inFollow [] fs = elem Nothing fs
 inFollow (t:_) fs = elem (Just (name t)) fs
 
-getVal :: Token -> a
-getVal (TokenN x) = unsafeCoerce x
-getVal t = unsafeCoerce t

@@ -2,7 +2,7 @@
 module Calculator where
 =}
 
-%name calc E
+%name E
 %tokentype {= Token =}
 %error {= parseError =}
 

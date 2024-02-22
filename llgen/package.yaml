@@ -56,6 +56,28 @@ executables:
     - llgen
     - text
 
+  calc-exe:
+    main: Main.hs
+    source-dirs: calc
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - llgen
+      - regex-tdfa
+
+  labtwo-exe:
+    main: Main.hs
+    source-dirs: labtwo
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - llgen
+      - regex-tdfa
+
 tests:
   llgen-test:
     main:                Spec.hs

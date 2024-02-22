@@ -23,7 +23,6 @@ source-repository head
 
 library
   exposed-modules:
-      Calculator
       Generator
       Grammar
       Language.Haskell.TH.ParseGen
@@ -46,6 +45,38 @@ library
     , regex-tdfa
     , template-haskell
     , text
+  default-language: Haskell2010
+
+executable calc-exe
+  main-is: Main.hs
+  other-modules:
+      Calculator
+      Paths_llgen
+  autogen-modules:
+      Paths_llgen
+  hs-source-dirs:
+      calc
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , llgen
+    , regex-tdfa
+  default-language: Haskell2010
+
+executable labtwo-exe
+  main-is: Main.hs
+  other-modules:
+      Parser
+      Paths_llgen
+  autogen-modules:
+      Paths_llgen
+  hs-source-dirs:
+      labtwo
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , llgen
+    , regex-tdfa
   default-language: Haskell2010
 
 executable llgen-exe

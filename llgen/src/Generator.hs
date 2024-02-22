@@ -10,7 +10,8 @@ lineSep :: [String] -> T.Text
 lineSep names = T.unlines (map T.pack names)
 
 defaultHeader, importBlock :: [String]
-defaultHeader = ["{-# OPTIONS_GHC -w #-}"]
+defaultHeader = ["{-# OPTIONS_GHC -w #-}",
+                 "{-# LANGUAGE TypeApplications #-}"]
 
 importBlock = [ "import Language.Haskell.TH.ParseGen"
               , "import qualified Data.List as L"
@@ -90,7 +91,4 @@ constBody = T.pack $ "\n\
 \inFollow [] fs = elem Nothing fs\n\
 \inFollow (t:_) fs = elem (Just (name t)) fs\n\
 \\n\
-\getVal :: Token -> a\n\
-\getVal (TokenN x) = unsafeCoerce x\n\
-\getVal t = unsafeCoerce t\n\
 \"

@@ -9,10 +9,10 @@ import qualified Data.Text.IO as TIO
 
 main :: IO ()
 main = do
-  putStrLn "Input name of file (without extension)"
+  putStrLn "Input path of file (without extension)"
   fileName <- getLine
-  gramFile <- readFile $ fileName ++ ".y"
+  gramFile <- readFile $ fileName ++ ".gram"
   let tokens = lexer gramFile
   let parsed = parse tokens
   text <- generate parsed
-  TIO.writeFile ("./src/" ++ fileName ++ ".hs") text
+  TIO.writeFile (fileName ++ ".hs") text

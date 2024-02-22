@@ -158,7 +158,7 @@ mkParse parseTyN fstMap flwMap (Prod nTStr rules)
 
 mkLexer :: Info -> Q [Dec]
 mkLexer info
-  = concat <$> sequence [ mkTokenData info, mkNameFunc info, mkLexerConstants info]
+  = concat <$> sequence [ mkTokenData info, mkNameFunc info, mkLexerConstants info, mkGetVal info]
 
 mkLexerConstants :: Info -> Q [Dec]
 mkLexerConstants info = concat <$> sequence [ mkRegexs, mkSkip ]
@@ -170,7 +170,10 @@ mkLexerConstants info = concat <$> sequence [ mkRegexs, mkSkip ]
         getRegexs = map getRegex (tokens info)
         getRegex (_, r, b) = TupE [ Just (LitE (StringL ('^':r)))
                                   , Just (getFunc (parseExp b)) ]
-        getFunc (AppE c@(ConE _) (ConE _)) = InfixE (Just c) (VarE (mkName ".")) (Just $ VarE (mkName "read"))
+        getFunc (AppE c@(ConE _) (ConE argTN)) | argTN == (mkName "String") = c
+                                               | otherwise                  = InfixE (Just c)
+                                                                                     (VarE (mkName "."))
+                                                                                     (Just $ VarE (mkName "read"))
         getFunc c@(ConE _) = AppE (VarE (mkName "const")) c
         getFunc e = error $ "unknown token signature: " ++ show e
     mkSkip = let skipN = mkName "skip" in pure $ [ValD (VarP skipN) (NormalB (LitE (StringL $ '^':(skip info)))) []]
@@ -201,3 +204,21 @@ mkNameFunc info = let tN = mkName "t"
           (AppE (ConE tokCN) (ConE _)) -> ConP tokCN [] [WildP]
           (ConE tokCN) -> ConP tokCN [] []
           e -> error $ "unknown token signature: " ++ show e
+
+mkGetVal :: Info -> Q [Dec]
+mkGetVal info = do let fName = mkName "getVal"
+                   pure $ [FunD fName clauses]
+  where
+    clauses :: [Clause]
+    clauses = let tBlocks = map (\(_, _, tBlock) -> parseExp tBlock) (tokens info)
+              in map mkClause tBlocks
+      where
+        mkClause :: Exp -> Clause
+        mkClause (AppE (ConE tokCN) (ConE _)) = let varName = mkName "x"
+                                                in Clause [ConP tokCN [] [VarP varName]]
+                                                          (NormalB (AppE (VarE (mkName "unsafeCoerce")) (VarE varName)))
+                                                          []
+        mkClause (ConE tokCN) = let tokV = mkName "t"
+                                in Clause [AsP tokV (ConP tokCN [] [])]
+                                          (NormalB (AppE (VarE (mkName "unsafeCoerce")) (VarE tokV)))
+                                          []
