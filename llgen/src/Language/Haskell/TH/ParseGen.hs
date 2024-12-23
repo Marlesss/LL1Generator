@@ -68,10 +68,29 @@ mkParsers info@(Info _ _ tokTyS _ _) prods
            fstMap  = getFirst prodMap
            flwMap  = getFollow info fstMap prodMap
            tokName = mkName tokTyS
+       checkGrammarLL1 fstMap flwMap
        decs1 <- mkLexer info
        (parseTyN, decs2) <- mkClassParse tokName
        decs3 <- sequence (map (mkParse parseTyN fstMap flwMap) prods)
        pure $ decs1 ++ decs2 ++ (concat decs3)
+  where
+    checkGrammarLL1 :: Monad m => FFMap -> FFMap -> m ()
+    checkGrammarLL1 fstMap flwMap = mapM_ checkProductionLL1 prods
+      where
+        checkProductionLL1 :: Monad m => Production -> m ()
+        checkProductionLL1 (Prod nonTerm rules) = sequence_ [satisfyLL1 r1 r2 | r1 <- rules, r2 <- rules, r1 /= r2]
+          where
+            satisfyLL1 (Rule sent1 _) (Rule sent2 _) = let first1 = firstSent fstMap sent1
+                                                           follow1 = defLookup flwMap nonTerm DS.empty
+                                                           first2 = firstSent fstMap sent2
+                                                           check = if DS.member Eps first1
+                                                                   then DS.null (DS.intersection follow1 first2)
+                                                                   else DS.null (DS.intersection first1 first2)
+                                                       in if not check
+                                                          then error ("Is not ll1: " ++ nonTerm ++ " -- " ++
+                                                                      show sent1 ++ " -- " ++
+                                                                      show sent2)
+                                                          else pure ()
 
 mkClassParse :: Name -> Q (Name, [Dec])
 mkClassParse tokName

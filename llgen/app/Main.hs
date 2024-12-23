@@ -6,6 +6,7 @@ import Grammar
 import Lexer
 import Generator
 import qualified Data.Text.IO as TIO
+import Control.Exception (SomeException, catch)
 
 main :: IO ()
 main = do
@@ -14,5 +15,9 @@ main = do
   gramFile <- readFile $ fileName ++ ".gram"
   let tokens = lexer gramFile
   let parsed = parse tokens
-  text <- generate parsed
-  TIO.writeFile (fileName ++ ".hs") text
+  catch (gen parsed fileName) handleErr
+  where
+    gen parsed fileName = do text <- generate parsed
+                             TIO.writeFile (fileName ++ ".hs") text
+    handleErr :: SomeException -> IO ()
+    handleErr ex = putStrLn $ "Caught exception: " ++ show ex

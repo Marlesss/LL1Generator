@@ -76,7 +76,7 @@ data DirectiveArg
   | Regex String
   deriving Show
 data Production = Prod NonTermName [Rule] deriving Show
-data Rule = Rule [Either TermName NonTermName] Block deriving Show
+data Rule = Rule [Either TermName NonTermName] Block deriving (Show, Eq)
 
 parseError tokens = error $ "Parse error: " ++ (show tokens)
 }

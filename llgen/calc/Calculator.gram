@@ -7,13 +7,15 @@ module Calculator where
 %error {= parseError =}
 
 %token
-  n   /[[:digit:]]+/ {= TokenN NumT =}
-  '(' /\(/           {= TokenLBr   =}
-  ')' /\)/           {= TokenRBr   =}
-  '+' /\+/           {= TokenPlus  =}
-  '-' /-/            {= TokenMinus  =}
-  '*' /\*/           {= TokenMult  =}
-  '/' ///            {= TokenDiv  =}
+  n   /[[:digit:]]+/             {= TokenN NumT =}
+  '(' /\(/                       {= TokenLBr   =}
+  ')' /\)/                       {= TokenRBr   =}
+  '+' /\+/                       {= TokenPlus  =}
+  '-' /-/                        {= TokenMinus  =}
+  '*' /\*/                       {= TokenMult  =}
+  '/' ///                        {= TokenDiv  =}
+  ',' /,/                        {= TokenComma =}
+  func /[[:lower:]][[:alnum:]]*/ {= TokenFunc String =}
 
 %skip /[[:space:]]+/
 
@@ -33,7 +35,13 @@ Tf : '*' F Tf {= Mult $2 $3 =}
 
 F : '(' E ')' {= Brace $2 =}
   | n         {= N $1 =}
+  | func '(' Args ')' {= Func $1 (argsToList $3) =}
 
+Args :            {= ArgsEmpty =}
+     | E ArgsTail {= ArgsNonEmpty $1 $2 =}
+
+ArgsTail :                {= ArgsTailEmpty =}
+         | ',' E ArgsTail {= ArgsTail $2 $3 =}
 {=
 type NumT = Double
 
@@ -52,7 +60,23 @@ data Tf
 data F
   = Brace E
   | N NumT
+  | Func String [E]
   deriving Show
+data Args
+  = ArgsEmpty
+  | ArgsNonEmpty E ArgsTail
+  deriving Show
+data ArgsTail
+  = ArgsTailEmpty
+  | ArgsTail E ArgsTail
+  deriving Show
+
+argsToList :: Args -> [E]
+argsToList ArgsEmpty = []
+argsToList (ArgsNonEmpty e tail) = e : tailToList tail
+  where
+    tailToList ArgsTailEmpty = []
+    tailToList (ArgsTail e' tail') = e' : tailToList tail'
 
 class Calc a where
   calc :: a -> NumT

@@ -52,7 +52,7 @@ data Token
   | TokenArg Exp
   deriving Show
 
-knownOps = ["++", "==", "||", "&&", "+", "-", "*", "/", ".", "$"]
+knownOps = ["++", "==", "||", "&&", "+", "-", "*", "/", ".", "$", ":"]
 
 lexer :: String -> [Token]
 lexer [] = []

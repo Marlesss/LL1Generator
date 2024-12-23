@@ -40,6 +40,8 @@ library:
     - containers
     - template-haskell
     - regex-tdfa
+    - prettyprinter
+    - mtl
   build-tools:
     - happy
 
@@ -77,6 +79,7 @@ executables:
     dependencies:
       - llgen
       - regex-tdfa
+
 
 tests:
   llgen-test:

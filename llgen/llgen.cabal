@@ -42,6 +42,8 @@ library
       array
     , base >=4.7 && <5
     , containers
+    , mtl
+    , prettyprinter
     , regex-tdfa
     , template-haskell
     , text
