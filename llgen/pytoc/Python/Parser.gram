@@ -1,0 +1,123 @@
+{=
+module Python.Parser where
+
+import Prelude hiding (LT, GT, EQ)
+import Python.Grammar
+=}
+
+%name Program
+%tokentype {= Token =}
+%error {= parseError =}
+
+%token
+  '='   /\=/                      {= TokenEq      =}
+  '+'   /\+/                      {= TokenPlus    =}
+  '-'   /\-/                      {= TokenMinus   =}
+  '*'   /\*/                      {= TokenTimes   =}
+  '/'   /\//                      {= TokenDiv     =}
+  '<'   /</                       {= TokenLT      =}
+  '<='  /<=/                      {= TokenLE      =}
+  '>'   />/                       {= TokenGT      =}
+  '>='  />=/                      {= TokenGE      =}
+  '=='  /==/                      {= TokenEqEq    =}
+  '!='  /\!=/                     {= TokenNQ      =}
+  'and' /and/                     {= TokenAnd     =}
+  'or'  /or/                      {= TokenOr      =}
+  'not' /not/                     {= TokenNot     =}
+  '('   /\(/                      {= TokenOB      =}
+  ')'   /\)/                      {= TokenCB      =}
+  '\n'  /\n/                      {= TokenEOL     =}
+  if    /if/                      {= TokenIf      =}
+  else  /else/                    {= TokenElse    =}
+  '{'   /\{/                      {= TokenOCurly  =}
+  '}'   /\}/                      {= TokenCCurly  =}
+  ','   /\,/                      {= TokenComma   =}
+  '::'  /::/                      {= TokenSignat  =}
+  for   /for/                     {= TokenFor     =}
+  while /while/                   {= TokenWhile   =}
+  in    /in/                      {= TokenIn      =}
+  '...' /.../                     {= TokenRIncl   =}
+  '..<' /..</                     {= TokenRExcl   =}
+  int   /[[:digit:]]+/            {= TokenInt Int  =}
+  bool  /(true|false)/            {= TokenBool String =}
+  type  /(Int|String|Boolean)/    {= TokenType String =}
+  str   /"(.*)"/                  {= TokenStr String  =}
+  var   /[[:alpha:]][[:alnum:]]*/ {= TokenVar String  =}
+
+%skip /[[:space:]]+/
+
+%%
+
+Program : Statement Pf {= Program $1 $2 =}
+
+Pf : {= PfEmpty =}
+   | '\n' Statement Pf {= Pf $2 $3 =}
+
+Statement
+  :                                              {= StatementEmpty =}
+  | var '::' type                                {= Define $1 (typeToPrimitiveType $3) =}
+  | var '::' type '=' Expr                       {= DefineSet $1 (typeToPrimitiveType $3) $5 =}
+  | var '=' Expr                                 {= Set $1 $3 =}
+  | if Expr '{' Program '}'                      {= If $2 $4 =}
+  | if Expr '{' Program '}' else '{' Program '}' {= IfElse $2 $4 $8 =}
+  | for var in Range '{' Program '}'             {= For $2 $4 $6 =}
+  | while Expr '{' Program '}'                   {= While $2 $4 =}
+  | Expr                                         {= StExpr $1 =}
+
+Expr : Ar Ef {= Expr $1 $2 =}
+Ef :         {= EfEmpty =}
+   | '<' Ar  {= LT $2 =}
+   | '<=' Ar {= LE $2 =}
+   | '>' Ar  {= GT $2 =}
+   | '>=' Ar {= GE $2 =}
+   | '==' Ar {= EQ $2 =}
+   | '!=' Ar {= NQ $2 =}
+
+Ar : T Arf {= Ar $1 $2 =}
+
+Arf :           {= ArfEmpty =}
+    | '+' T Arf {= Plus $2 $3 =}
+    | '-' T Arf {= Minus $2 $3 =}
+
+T : D Tf {= T $1 $2 =}
+
+Tf :          {= TfEmpty =}
+   | '*' D Tf {= Times $2 $3 =}
+   | '/' D Tf {= Div $2 $3 =}
+
+D : C Df {= D $1 $2 =}
+
+Df :           {= DfEmpty =}
+   | 'or' C Df {= Or $2 $3 =}
+
+C : Call Cf {= C $1 $2 =}
+
+Cf : {= CfEmpty =}
+   | 'and' Call Cf {= And $2 $3 =}
+
+Call : Y Callf {= Call $1 $2 =}
+
+Callf :              {= CallfEmpty =}
+      | '(' Args ')' {= Callf $2 =}
+
+Y : '(' Expr ')' {= Brack $2 =}
+  | int          {= IntVal $1 =}
+  | bool         {= BoolVal $1 =}
+  | str          {= StrVal $1 =}
+  | var          {= Var $1 =}
+
+Args
+  :                {= ArgsEmpty =}
+  | Expr Argsf     {= Args $1 $2 =}
+
+Argsf
+  :                {= ArgsfEmpty =}
+  | ',' Expr Argsf {= Argsf $2 $3 =}
+
+Range
+  : Expr '...' Expr {= Inclusive $1 $3 =}
+  | Expr '..<' Expr {= Exclusive $1 $3 =}
+
+{=
+parseError _ = error "Parse error"
+=}
